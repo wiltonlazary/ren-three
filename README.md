@@ -1,6 +1,6 @@
 # ren-three
 
-The three.js renderer for [ren-core](../../../ren-core/wtree/_repo_): a ren-core `Host`
+The three.js renderer for [ren-core](https://github.com/wiltonlazary/ren-core): a ren-core `Host`
 (`ren-core/host`) over a three.js scene graph. JSX describes the scene; rrx-core
 signals drive it; ren-core's control flow (`Show`, `For`, `Choose`, `Render`,
 `Pending`, `Recover`) adds and removes objects. Plain JavaScript with JSDoc
@@ -95,7 +95,7 @@ Root({ id: 'stage', target: document.body, renderer: $three(THREE, { width: 640,
   canvas; `<perspectiveCamera main>` in the view replaces it.
 - **Portable primitives render too** (`View`, `Layout`, `Scroll`, `Label`,
   `Edit`, `Action`, `Image`, `Shape`), through
-  [ren-canv](../../../ren-canv/wtree/_repo_): the same layout, portable style,
+  [ren-canv](https://github.com/wiltonlazary/ren-canv): the same layout, portable style,
   editing, text selection, native text entry and accessibility mirror as on
   ren-skia, drawn with a 2D canvas into a texture. An application of
   primitives alone runs here as on ren-dom or ren-skia, and mixes freely
@@ -297,10 +297,10 @@ ren-core/esbuild (`ren-core/compiled`).
 
 ## Benchmarks
 
-The harnesses live in [ren-bench](../../../ren-bench/wtree/_repo_/README.md).
+The harnesses live in [ren-bench](https://github.com/wiltonlazary/ren-bench).
 Run benchmark commands from that checkout.
 
-[ren-bench's three.js benchmark](../../../ren-bench/wtree/_repo_/bench/r3f/README.md) measures ren-three
+[ren-bench's three.js benchmark](https://github.com/wiltonlazary/ren-bench/blob/main/bench/r3f/README.md) measures ren-three
 against a market renderer on the same scene
 (1,000 meshes in a keyed list, created, recolored, reordered, removed), as
 each library's users write it; its README has the method and the current
