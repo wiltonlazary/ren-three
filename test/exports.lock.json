@@ -1,0 +1,13 @@
+{
+  ".": {
+    "$animate": "function",
+    "$three": "function",
+    "CONSTRUCT": "object",
+    "Renderer": "class",
+    "Tick": "class",
+    "loadLayout": "function",
+    "loadShaper": "function",
+    "remoteLayout": "function",
+    "render": "function"
+  }
+}
