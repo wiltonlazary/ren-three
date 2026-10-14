@@ -7,7 +7,8 @@ signals drive it; ren-core's control flow (`Show`, `For`, `Choose`, `Render`,
 types, strict `tsc` checking and generated declarations.
 
 The package is published on npm as `@maxenve/ren-three` under the MIT license;
-install it under its import name: `npm install ren-three@npm:@maxenve/ren-three`. Its runtime dependencies are ren-canv and ren-core (linked from
+install it under its import name: `npm install ren-three@npm:@maxenve/ren-three`.
+Its runtime dependencies are ren-canv and ren-core (linked from
 the sibling checkouts); three.js is a peer
 the caller imports and passes in (`>=0.160`; tested with 0.186.1), so the
 application decides how it loads (ren-show loads it as a chunk of its
