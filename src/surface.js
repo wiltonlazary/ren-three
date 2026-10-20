@@ -35,6 +35,7 @@ export class Surface extends Document {
       theme: options.theme,
       background: 0,
       aria: options.aria,
+      behavior: options.behavior,
       fit: panel,
       layout: options.layout,
     });

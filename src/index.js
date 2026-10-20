@@ -36,7 +36,7 @@
 // changing signals whose writes cross like any update. Pointer events cross
 // with their canvas coordinates; refs in the worker are handles.
 
-import { mount, $surface, $active } from 'ren-core/host';
+import { mount, $surface, $active, behaviorOf } from 'ren-core/host';
 import { $owner, $cleanup, $deliver, $flush } from 'ren-core';
 import { Item, Faces } from 'ren-canv';
 
@@ -79,6 +79,7 @@ import { Surface } from './surface.js';
  * @property {number=} pixel The world units of one pixel of a panel (0.01).
  * @property {import('ren-core/host').Tokens=} theme Theme overrides for the primitives.
  * @property {(boolean | 'demand')=} aria The accessibility mirror of the primitives, as ren-canv's.
+ * @property {import('ren-core/host').Behavior=} behavior How the canvas behaves under the user's hands, as ren-canv's: as an application ('app', the default: loose text not selectable, Ctrl or Cmd+A and the I-beam only in an Edit or a `select: 'text'` element, the browser's context menu only in an Edit (not over the scene), no touch callout), as a page ('page'), or `like` one with switches of its own.
  * @property {import('ren-canv').LayoutPort=} layout Where the primitives are laid out: this thread by default, or the layout worker `remoteLayout(port)` reaches (ren-canv's).
  * @property {import('ren-canv/backend').Picture=} image Loads an Image source into something a 2D canvas draws (an HTMLImageElement by default).
  * @property {(string | null)=} cursor The CSS cursor over an object with a press handler (`onClick`, `onDblClick`, `onPointerDown`, `onPointerUp`) and no `cursor` of its own, or over a child: 'pointer' by default, null for none.
@@ -365,6 +366,8 @@ export class Renderer {
     this.kit = kit;
     this.construct = CONSTRUCT;
     this.options = options;
+    /** How the canvas behaves under the user's hands: each switch of its `behavior` (its surfaces take it too). @type {import('ren-core/host').Switches} */
+    this.behavior = behaviorOf(options.behavior);
     /** The scene, and the container views render into. */
     this.scene = new kit.Scene();
     this.scene.__ren = new Slot();
@@ -1388,7 +1391,8 @@ export class Renderer {
    * primitives and the scene (`input`), keys and copy to the surface last
    * pressed (keys with none to the overlay or the first panel, for the
    * root's `$keys`; a chord reaches the handlers, as on ren-canv's attach).
-   * Returns the function that stops.
+   * The canvas takes the CSS its behavior asks (no touch callout, not
+   * selectable itself). Returns the function that stops.
    * @param {any} canvas
    */
   attach(canvas) {
@@ -1424,10 +1428,11 @@ export class Renderer {
       const sy = canvas.clientHeight > 0 ? this.height / canvas.clientHeight : 1;
       const x = e.offsetX * sx;
       const y = e.offsetY * sy;
-      // The browser's context menu stays away where a surface's item shows the app's own (prevent="contextmenu").
+      // The browser's context menu opens only where the behavior keeps it (on a surface, as its `menu` answers:
+      // an app's in an Edit) and no surface's item shows the app's own (prevent="contextmenu"); the objects still hear it.
       if (e.type === 'contextmenu') {
         const at = this.surfaceAt(x, y);
-        if (at !== null && at[0].cancels('contextmenu', at[1], at[2])) e.preventDefault();
+        if (at !== null ? !at[0].menu(at[1], at[2]) : !this.behavior.menu) e.preventDefault();
       }
       if (e.type === 'pointerdown' || e.type === 'pointermove') {
         lastX = x;
@@ -1490,7 +1495,8 @@ export class Renderer {
       const surface = this.active ?? this.overlay ?? this.surfaces.values().next().value ?? null;
       if (surface === null) return;
       if (surface.key(e.key, e.shiftKey, e)) e.preventDefault();
-      else if (surface === this.active && (e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'a' || e.key === 'A') && surface.selectAll()) e.preventDefault();
+      // Ctrl or Cmd+A selects in the surface last pressed, and, with the behavior's `selectAll` off, never the browser's page.
+      else if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'a' || e.key === 'A') && ((surface === this.active && surface.selectAll()) || !this.behavior.selectAll)) e.preventDefault();
     };
     /** @param {any} e */
     const copy = e => {
@@ -1528,7 +1534,9 @@ export class Renderer {
     canvas.addEventListener('pointercancel', cancel);
     canvas.addEventListener('touchstart', touch, { passive: false });
     canvas.addEventListener('touchmove', moved, { passive: false });
+    const undress = dress(canvas, this.behavior);
     return () => {
+      undress();
       for (const type of types) canvas.removeEventListener(type, listener);
       for (const type of drags) canvas.removeEventListener(type, drag);
       canvas.removeEventListener('keydown', key);
@@ -1538,6 +1546,31 @@ export class Renderer {
       canvas.removeEventListener('touchmove', moved);
     };
   }
+}
+
+/**
+ * Sets the CSS a behavior gives the canvas, as ren-canv's attach does: no
+ * long-press callout or tap highlight without `callout`, and the canvas
+ * itself not selectable without `select`. Returns the function that puts
+ * back what was there.
+ * @param {any} canvas @param {import('ren-core/host').Switches} behavior
+ */
+function dress(canvas, behavior) {
+  const style = canvas?.style;
+  if (style == null || typeof style.setProperty !== 'function') return () => {};
+  /** @type {[string, string][]} */
+  const set = [];
+  if (!behavior.callout) set.push(['-webkit-touch-callout', 'none'], ['-webkit-tap-highlight-color', 'transparent']);
+  if (!behavior.select) set.push(['user-select', 'none'], ['-webkit-user-select', 'none']);
+  const was = set.map(([name]) => String(style.getPropertyValue(name) ?? ''));
+  for (const [name, value] of set) style.setProperty(name, value);
+  return () => {
+    set.forEach(([name, value], i) => {
+      if (style.getPropertyValue(name) !== value) return;
+      if (was[i] === '') style.removeProperty(name);
+      else style.setProperty(name, was[i]);
+    });
+  };
 }
 
 /**

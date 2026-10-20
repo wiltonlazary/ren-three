@@ -37,8 +37,8 @@ await loadLayout();
 /** DejaVu Sans, from the test fixtures (with its license). */
 const font = readFileSync(new URL('./fixtures/dejavu.ttf', import.meta.url));
 const stub = () => ({ render() {}, setSize() {} });
-/** A 200 × 100 renderer, its camera at z 5 looking at the origin. */
-const setup = () => $three(THREE, { renderer: stub(), width: 200, height: 100, schedule: false, font });
+/** A 200 × 100 renderer, its camera at z 5 looking at the origin. @param {{ behavior?: import('ren-core/host').Behavior }} [options] */
+const setup = (options = {}) => $three(THREE, { renderer: stub(), width: 200, height: 100, schedule: false, font, ...options });
 const texts = (/** @type {any} */ surface) => surface.commands().filter((/** @type {any[]} */ c) => c[0] === 'text').map((/** @type {any[]} */ c) => c[1]);
 
 describe('ren-three primitives', () => {
@@ -303,7 +303,8 @@ describe('ren-three primitives', () => {
   });
 
   it('selects text in the overlay with a drag, and copies it', () => {
-    const three = setup();
+    // A page's: loose text selects.
+    const three = setup({ behavior: 'page' });
     render(() => <View><Label text="select this text" /></View>, three);
     const overlay = /** @type {any} */ (three.overlay);
     three.input('pointerdown', 1, 10);
@@ -751,7 +752,8 @@ describe('ren-three primitives', () => {
   });
 
   it("counts a canvas element's clicks by time and place (a pointerdown's detail is 0), and keeps the browser's context menu off the app's own", () => {
-    const three = setup();
+    // A page's: loose text selects, and the browser's menu shows where the app has none.
+    const three = setup({ behavior: 'page' });
     render(() => (
       <View prevent="contextmenu" style={{ fontSize: 10, lineHeight: 2, width: 120 }}>
         <Label text="hello world" />
@@ -778,6 +780,88 @@ describe('ren-three primitives', () => {
     listeners.pointerup({ type: 'pointerup', offsetX: 12, offsetY: 10, button: 2, preventDefault() {} });
     assert.equal(overlay.copied(), 'world', 'the selection stays');
     assert.equal(fire('contextmenu', 180, 90), false, 'the scene keeps the browser\'s');
+  });
+
+  it("behaves as an application by default: the browser's context menu only in an Edit, Ctrl+A kept from the page, no touch callout", () => {
+    /**
+     * Overlay text at 0..20 and an Edit below it (50 wide), a panel's text at the
+     * origin, a box to the right hearing its context menu, attached to a
+     * canvas with a `behavior`.
+     * @param {import('ren-core/host').Behavior} [behavior]
+     */
+    const build = behavior => {
+      const three = setup({ behavior });
+      /** @type {string[]} */
+      const heard = [];
+      render(() => (
+        <>
+          <View style={{ fontSize: 10, lineHeight: 2, width: 60 }}>
+            <Label text="hello world" />
+            <Edit value="alpha" style={{ width: 50 }} />
+          </View>
+          <group>
+            <View style={{ fontSize: 10, lineHeight: 2, width: 100, height: 50 }}><Label text="panel text" /></View>
+          </group>
+          <mesh position={[3, 0, 0]} onContextMenu={() => heard.push('box')}>
+            <boxGeometry params={[1, 1, 1]} />
+            <meshBasicMaterial />
+          </mesh>
+        </>
+      ), three);
+      three.frame();
+      const panel = /** @type {any} */ ([...three.surfaces].find(s => /** @type {any} */ (s).panel));
+      /** @type {Record<string, (e: any) => void>} */
+      const listeners = {};
+      /** @type {Map<string, string>} */
+      const props = new Map();
+      const style = {
+        setProperty: (/** @type {string} */ name, /** @type {string} */ value) => void props.set(name, value),
+        getPropertyValue: (/** @type {string} */ name) => props.get(name) ?? '',
+        removeProperty: (/** @type {string} */ name) => void props.delete(name),
+      };
+      const stop = three.attach({ tabIndex: 0, clientWidth: 0, clientHeight: 0, style, addEventListener: (/** @type {string} */ type, /** @type {any} */ fn) => void (listeners[type] = fn), removeEventListener() {} });
+      const fire = (/** @type {string} */ type, /** @type {number} */ x, /** @type {number} */ y, /** @type {any} */ more = {}) => {
+        const e = { type, offsetX: x, offsetY: y, button: type === 'contextmenu' ? 2 : 0, detail: 0, timeStamp: 0, prevented: false, preventDefault() { e.prevented = true; }, ...more };
+        listeners[type](e);
+        return e.prevented;
+      };
+      const all = () => fire('keydown', 0, 0, { key: 'a', ctrlKey: true, metaKey: false, altKey: false, shiftKey: false });
+      const overlay = /** @type {any} */ (three).overlay;
+      return { three, panel, overlay, heard, fire, all, props, stop };
+    };
+    const app = build();
+    const [px, py] = app.three.project(app.panel, 10, 10);
+    assert.equal(app.fire('contextmenu', 10, 10), true, 'over overlay text');
+    assert.equal(app.fire('contextmenu', 17, 37), false, 'over an Edit: paste, spelling');
+    assert.equal(app.fire('contextmenu', px, py), true, 'over a panel\'s text');
+    assert.equal(app.fire('contextmenu', 164, 50), true, 'over an object');
+    assert.deepEqual(app.heard, ['box'], 'which still hears it');
+    assert.equal(app.fire('contextmenu', 180, 90), true, 'over the empty scene');
+    assert.equal(app.all(), true, 'Ctrl+A with nothing pressed: not the page');
+    assert.equal(app.overlay.copied(), '');
+    app.fire('pointerdown', 5, 10);
+    app.fire('pointerup', 5, 10);
+    assert.equal(app.all(), true);
+    assert.equal(app.overlay.copied(), '', 'loose text: nothing');
+    app.fire('pointerdown', 17, 37);
+    app.fire('pointerup', 17, 37);
+    assert.equal(app.all(), true);
+    assert.equal(app.overlay.copied(), 'alpha', 'the focused Edit\'s value');
+    assert.equal(app.props.get('-webkit-touch-callout'), 'none');
+    assert.equal(app.props.get('user-select'), 'none');
+    app.stop();
+    assert.equal(app.props.size, 0, 'put back');
+    const page = build('page');
+    assert.deepEqual([page.fire('contextmenu', 10, 10), page.fire('contextmenu', 17, 37), page.fire('contextmenu', 164, 50), page.fire('contextmenu', 180, 90)], [false, false, false, false], 'a page keeps the browser\'s');
+    assert.equal(page.all(), false, 'Ctrl+A with nothing pressed: the browser\'s');
+    assert.equal(page.props.size, 0);
+    page.stop();
+    const menu = build({ menu: true });
+    assert.deepEqual([menu.fire('contextmenu', 10, 10), menu.fire('contextmenu', 164, 50), menu.fire('contextmenu', 180, 90)], [false, false, false], 'menu alone');
+    menu.stop();
+    const edit = build({ editMenu: false });
+    assert.equal(edit.fire('contextmenu', 17, 37), true, 'editMenu: false');
+    edit.stop();
   });
 
   it("keeps a touch a surface took from the page's pan, and ends a press the browser takes back with pointercancel", () => {

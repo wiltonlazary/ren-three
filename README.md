@@ -194,7 +194,8 @@ tests and hosts with their own loop.
 `dblclick`, `contextmenu`, `pointerdown`, `pointerup`, `pointermove`,
 `pointercancel` (the browser took the pointer back; where it last was),
 `wheel`, and `pointerover`/`pointerout` as the objects under the pointer
-change. Files dragged over the canvas where no primitive takes them reach
+change. An object's `contextmenu` comes with the browser's own menu kept
+away unless the `behavior`'s `menu` is on (a page's). Files dragged over the canvas where no primitive takes them reach
 `onDragOver` (with `files`, their count, and `types`) and `onDrop`
 (`files`, the dropped File objects) on the objects under them. The nearest hit's handler runs first, then its ancestors', until one
 calls `stopPropagation()`. The event carries `object` (hit), `currentObject`
@@ -233,6 +234,7 @@ come back.
 | `pixel` | world units per pixel of a panel (0.01) |
 | `theme` | theme overrides for the primitives (ren-core's tokens) |
 | `aria` | the primitives' accessibility mirror, as ren-canv's (`true`, `false`, `'demand'`) |
+| `behavior` | how the canvas behaves under the user's hands, as ren-canv's: `'app'` (default: loose text not selectable; Ctrl or Cmd+A, the I-beam and the browser's context menu only in an Edit or a `select: 'text'` element, nowhere over the scene; no touch callout), `'page'`, or `{ like, select, selectAll, textCursor, menu, editMenu, callout }` |
 | `layout` | where the primitives are laid out: this thread (default), or a layout worker, `remoteLayout(port)` |
 | `image` | loads an `Image` source for a 2D canvas (an HTMLImageElement by default) |
 
