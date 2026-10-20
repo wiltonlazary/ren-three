@@ -80,6 +80,10 @@ export class Surface extends Document {
     /** Stops the entry and mirror beside the three.js canvas. @type {(() => void) | null} */
     this.stop = null;
     if (owner.canvas != null && doc !== null) this.stop = attach(this, owner.canvas, { input: false, shift: !panel });
+    // A frame that changes the cursor under a still pointer (a press, a restyle) shows it while the pointer is here.
+    this.aimed = () => {
+      if ((owner.grab ?? owner.over) === this) owner.show(this);
+    };
   }
 
   get kind() {

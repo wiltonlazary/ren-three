@@ -81,6 +81,7 @@ import { Surface } from './surface.js';
  * @property {(boolean | 'demand')=} aria The accessibility mirror of the primitives, as ren-canv's.
  * @property {import('ren-canv').LayoutPort=} layout Where the primitives are laid out: this thread by default, or the layout worker `remoteLayout(port)` reaches (ren-canv's).
  * @property {import('ren-canv/backend').Picture=} image Loads an Image source into something a 2D canvas draws (an HTMLImageElement by default).
+ * @property {(string | null)=} cursor The CSS cursor over an object with a press handler (`onClick`, `onDblClick`, `onPointerDown`, `onPointerUp`) and no `cursor` of its own, or over a child: 'pointer' by default, null for none.
  */
 
 /** Font families registered for the primitives, one per renderer. */
@@ -96,6 +97,9 @@ export const CONSTRUCT = new Set(['params', 'slot', 'of', 'dispose']);
 
 /** Element props that are not three.js properties. */
 const RESERVED = new Set([...CONSTRUCT, 'main', 'key', 'cursor']);
+
+/** The handlers that make an object pressable: the `cursor` option shows over it. */
+const PRESSES = ['click', 'dblclick', 'pointerdown', 'pointerup'];
 
 /** Events that bubble through ancestors; over and out go to the objects the pointer enters and leaves. */
 const HOVER = new Set(['pointerover', 'pointerout']);
@@ -394,6 +398,8 @@ export class Renderer {
     this.listening = 0;
     /** Objects with a `cursor`: while any, the pointer is raycast for them too. */
     this.cursors = 0;
+    /** The cursor over an object with a press handler and no cursor of its own (the `cursor` option; null: none). @type {string | null} */
+    this.cursor = options.cursor === undefined ? 'pointer' : options.cursor || null;
     /** `<gl>`'s settings by property name, applied to the drawer. @type {any} */
     this.gl = { settings: new Map() };
     /** Object3D's own fields, which a rebuild from new params leaves alone. @type {Set<string> | null} */
@@ -1117,7 +1123,7 @@ export class Renderer {
     if (type === 'pointermove' || type === 'pointerleave') {
       const over = type === 'pointerleave' ? [] : this.chain(hits);
       // The cursor of the nearest hovered object that has one, where no primitive is under the pointer.
-      if (this.over === null) this.shown(over.find(o => slot(o).cursor !== null) ?? null);
+      if (this.over === null) this.shown(over.find(o => this.cursorOf(o) !== null) ?? null);
       const before = this.hovered;
       for (const object of before) if (!over.includes(object)) ran = this.call(object, 'pointerout', null, x, y, native) || ran;
       for (const object of over) if (!before.includes(object)) ran = this.call(object, 'pointerover', hits[0] ?? null, x, y, native) || ran;
@@ -1337,8 +1343,20 @@ export class Renderer {
   shown(object) {
     const style = this.canvas?.style;
     if (style == null) return;
-    const cursor = object === null ? '' : /** @type {string} */ (slot(object).cursor);
+    const cursor = object === null ? '' : (this.cursorOf(object) ?? '');
     if (style.cursor !== cursor) style.cursor = cursor;
+  }
+
+  /**
+   * The cursor over a three.js object: its own `cursor`, else the `cursor`
+   * option where it has a press handler; null for none.
+   * @param {any} object
+   */
+  cursorOf(object) {
+    const s = slot(object);
+    if (s.cursor !== null) return s.cursor;
+    const handlers = s.handlers;
+    return this.cursor !== null && handlers !== null && PRESSES.some(name => handlers[name] !== undefined) ? this.cursor : null;
   }
 
   /**

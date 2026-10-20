@@ -750,6 +750,40 @@ describe('ren-three', () => {
     $dispose(R);
   });
 
+  it('shows the cursor option over an object with a press handler: a hand by default, its own cursor first, none without a handler', () => {
+    /** The canvas cursor at the middle of each of four boxes in a row: onClick, no handler, its own cursor and onPointerDown, a group's onPointerUp. @param {any} options */
+    const cursors = options => {
+      const { three } = setup(options);
+      const R = Root('press-cursor');
+      const box = () => [<boxGeometry params={[1, 1, 1]} />, <meshBasicMaterial />];
+      const dispose = render(
+        () => (
+          <>
+            <mesh position-x={-3} onClick={() => {}}>{box()}</mesh>
+            <mesh position-x={-1}>{box()}</mesh>
+            <mesh position-x={1} cursor="move" onPointerDown={() => {}}>{box()}</mesh>
+            <group position-x={3} onPointerUp={() => {}}><mesh>{box()}</mesh></group>
+          </>
+        ),
+        three,
+        { root: R },
+      );
+      three.canvas = /** @type {any} */ ({ style: { cursor: '' }, clientWidth: 200, clientHeight: 100, addEventListener() {}, removeEventListener() {} });
+      three.camera.updateMatrixWorld();
+      const out = [-3, -1, 1, 3, 6].map(x => {
+        const p = new THREE.Vector3(x, 0, 0).project(three.camera);
+        three.input('pointermove', ((p.x + 1) / 2) * 200, 50);
+        return three.canvas.style.cursor;
+      });
+      dispose();
+      $dispose(R);
+      return out;
+    };
+    assert.deepEqual(cursors({}), ['pointer', '', 'move', 'pointer', ''], 'a hand over what presses, a child of it too; its own cursor first');
+    assert.deepEqual(cursors({ cursor: 'crosshair' }), ['crosshair', '', 'move', 'crosshair', ''], 'the option sets it');
+    assert.deepEqual(cursors({ cursor: null }), ['', '', 'move', '', ''], 'null shows none');
+  });
+
   it('stops raycasting once the objects with a cursor are removed', () => {
     const { three } = setup();
     const R = Root('cursor-removed');

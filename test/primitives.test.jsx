@@ -395,6 +395,38 @@ describe('ren-three primitives', () => {
     assert.equal(canvas.style.cursor, '', 'over the scene: the page\'s own');
   });
 
+  it('shows the cursor of a panel\'s primitives, and one a press or a frame changes under a still pointer', () => {
+    const three = setup();
+    const R = Root('panel-cursor');
+    const tool = $signal(R, 'move');
+    render(() => (
+      <group onClick={() => {}}>
+        <View style={{ width: 100 }}>
+          <View style={{ height: 30, cursor: 'grab', press: { cursor: 'grabbing' } }} onPress={() => {}} />
+          <View style={() => ({ height: 30, cursor: $read(tool) })} />
+        </View>
+      </group>
+    ), three, { root: R });
+    const canvas = /** @type {any} */ ({ style: { cursor: '' } });
+    three.canvas = canvas;
+    three.present();
+    const panel = /** @type {any} */ ([...three.surfaces].find(s => /** @type {any} */ (s).panel));
+    const [ax, ay] = three.project(panel, 50, 15);
+    three.input('pointermove', ax, ay);
+    assert.equal(canvas.style.cursor, 'grab', 'the panel\'s item, not its group\'s hand');
+    three.input('pointerdown', ax, ay);
+    assert.equal(canvas.style.cursor, 'grabbing', 'pressed, with no move');
+    three.input('pointerup', ax, ay);
+    assert.equal(canvas.style.cursor, 'grab', 'released');
+    const [bx, by] = three.project(panel, 50, 45);
+    three.input('pointermove', bx, by);
+    assert.equal(canvas.style.cursor, 'move');
+    $write(tool, 'crosshair');
+    three.present();
+    assert.equal(canvas.style.cursor, 'crosshair', 'a restyle under a still pointer');
+    $dispose(R);
+  });
+
   it('measures a monospace family in the mono typeface', () => {
     const mono = readFileSync(new URL('./fixtures/dejavu-mono.ttf', import.meta.url));
     const three = $three(THREE, { renderer: stub(), width: 200, height: 100, schedule: false, font, mono });

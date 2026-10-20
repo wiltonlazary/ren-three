@@ -91,7 +91,10 @@ Root({ id: 'stage', target: document.body, renderer: $three(THREE, { width: 640,
   shadowMap-enabled />`): kept, applied to the renderer as it is made, and
   reactive like any property.
 - **Cursor.** `cursor="pointer"` on an object shows that CSS cursor while
-  the pointer is over it or a child (where no primitive is on top).
+  the pointer is over it or a child (where no primitive is on top). An
+  object with a press handler (`onClick`, `onDblClick`, `onPointerDown`,
+  `onPointerUp`) and no `cursor` of its own shows the `cursor` option's (a
+  hand, `'pointer'`, by default; `null` shows none), as a button does.
 - **Camera.** A PerspectiveCamera by default (`camera` option), sized to the
   canvas; `<perspectiveCamera main>` in the view replaces it.
 - **Portable primitives render too** (`View`, `Layout`, `Scroll`, `Label`,
@@ -151,14 +154,15 @@ Root({ id: 'stage', target: document.body, renderer: $three(THREE, { width: 640,
     `renderer.surfaces` holds the overlay's and every panel's, with the
     Document's API (`commands()`, `copied()`, `press`, `key`, …). Pointer
     events, keys, focus, scrolling and the cursor behave as on the DOM
-    (ren-canv's README, "Input as the DOM has it"). A root's `$keys` and
-    `$scrolls` (listened on the scene) hear every surface: the overlay's
-    and each panel's keys, chords too, and scrolls; a key with no surface
-    focused goes to the overlay (else the first panel). One surface has
-    the focus: a press, an item's `focus()` or `focusFirst()` and
-    `$focus(ref)` take it from the others, and the keys go there; a blur
-    handler there that moves the focus wins, in whichever surface, as in
-    Chrome.
+    (ren-canv's README, "Input as the DOM has it"); a cursor a press or a
+    frame changes under a still pointer shows with no move. A root's
+    `$keys` and `$scrolls` (listened on the scene) hear every surface: the
+    overlay's and each panel's keys, chords too, and scrolls; a key with
+    no surface focused goes to the overlay (else the first panel). One
+    surface has the focus: a press, an item's `focus()` or `focusFirst()`
+    and `$focus(ref)` take it from the others, and the keys go there; a
+    blur handler there that moves the focus wins, in whichever surface, as
+    in Chrome.
   - **Theme.** `renderer.setTheme(tokens)` takes a new theme at once for the
     overlay and every panel; the scene and all state stay.
   - **Viewport.** In a three.js root `$viewport()` and `$media()` read the
@@ -220,6 +224,7 @@ come back.
 | `renderer` | what draws: a `WebGLRenderer` made on the canvas by default (antialiased); or one given, or a function of the canvas that makes it (a WebGPU renderer, a stub in tests) |
 | `camera` | a three.js camera, or `{ fov, near, far, position }` for the default PerspectiveCamera (50°, 0.1, 1000, at [0, 0, 5]) |
 | `background` | the scene's background color |
+| `cursor` | the CSS cursor over an object with a press handler and no `cursor` of its own (`'pointer'`); `null` for none |
 | `schedule` | `'frame'` (default): frames on `requestAnimationFrame`; `false`: only when `frame()` is called |
 | `font` | the typeface's bytes for the primitives (needed once one renders) |
 | `mono` | a monospace typeface's bytes: text whose `fontFamily` names monospace is measured and drawn in it |
