@@ -426,7 +426,7 @@ export class Renderer {
     this.overlayCamera = null;
     /** Every surface, the overlay first. @type {Set<Surface>} */
     this.surfaces = new Set();
-    /** The root's root-wide listeners (ren-core's `$keys`, `$scrolls` on the scene), heard on every surface; `off` by surface, which goes with it. @type {Set<{ name: string, fn: (event: any) => void, off: Map<Surface, () => void> }>} */
+    /** The root's root-wide listeners (ren-core's `$keys`, `$scrolls`, `$presses` on the scene), heard on every surface; `off` by surface, which goes with it. @type {Set<{ name: string, fn: (event: any) => void, off: Map<Surface, () => void> }>} */
     this.rooted = new Set();
     /** The surfaces by their page's root item. @type {WeakMap<Item, Surface>} */
     this.pages = new WeakMap();
@@ -672,8 +672,8 @@ export class Renderer {
   /** @param {any} node @param {string} name @param {(event: any) => void} handler */
   listen(node, name, handler) {
     if (node instanceof Item) return this.page(node).listen(node, name, handler);
-    // Root-wide keys and scrolls (`$keys`, `$scrolls`) on the scene: every surface's, the overlay's and each panel's.
-    if (node === this.scene && (name === 'keys' || name === 'scrolls')) {
+    // Root-wide keys, scrolls and presses (`$keys`, `$scrolls`, `$presses`) on the scene: every surface's, the overlay's and each panel's.
+    if (node === this.scene && (name === 'keys' || name === 'scrolls' || name === 'presses')) {
       const r = { name, fn: handler, off: new Map([...this.surfaces].map(surface => [surface, surface.listen(surface.root, name, handler)])) };
       this.rooted.add(r);
       return () => {
@@ -1412,9 +1412,25 @@ export class Renderer {
     let pending = false;
     let startX = 0;
     let startY = 0;
+    /** Whether a surface's native text entry (a focused Edit's) holds the DOM focus. */
+    const held = () => {
+      const active = canvas.ownerDocument?.activeElement;
+      if (active == null) return false;
+      for (const surface of this.surfaces) if (surface.entry !== null && surface.entry.area === active) return true;
+      return false;
+    };
+    /**
+     * A press of another button (a right press, for the app's menu) leaves
+     * a focused Edit's native entry the DOM focus and its selection, which
+     * the canvas would take as the press's default, as ren-canv's attach.
+     * @param {any} e
+     */
+    const hold = e => {
+      if ((e.button ?? 0) !== 0 && held()) e.preventDefault();
+    };
     /** @param {any} e */
     const listener = e => {
-      if (e.type === 'pointerdown' && typeof canvas.focus === 'function') canvas.focus();
+      if (e.type === 'pointerdown' && typeof canvas.focus === 'function' && ((e.button ?? 0) === 0 || !held())) canvas.focus();
       // A drag keeps the pointer past the canvas's edge, as a native drag does (ren-canv's attach does the same).
       if (e.type === 'pointerdown' && (e.button ?? 0) === 0) {
         try {
@@ -1529,6 +1545,7 @@ export class Renderer {
     const drags = ['dragenter', 'dragover', 'dragleave', 'drop'];
     for (const type of types) canvas.addEventListener(type, listener, type === 'wheel' ? { passive: false } : undefined);
     for (const type of drags) canvas.addEventListener(type, drag);
+    canvas.addEventListener('mousedown', hold);
     canvas.addEventListener('keydown', key);
     canvas.addEventListener('copy', copy);
     canvas.addEventListener('pointercancel', cancel);
@@ -1539,6 +1556,7 @@ export class Renderer {
       undress();
       for (const type of types) canvas.removeEventListener(type, listener);
       for (const type of drags) canvas.removeEventListener(type, drag);
+      canvas.removeEventListener('mousedown', hold);
       canvas.removeEventListener('keydown', key);
       canvas.removeEventListener('copy', copy);
       canvas.removeEventListener('pointercancel', cancel);

@@ -162,7 +162,16 @@ Root({ id: 'stage', target: document.body, renderer: $three(THREE, { width: 640,
     surface has the focus: a press, an item's `focus()` or `focusFirst()`
     and `$focus(ref)` take it from the others, and the keys go there; a
     blur handler there that moves the focus wins, in whichever surface, as
-    in Chrome.
+    in Chrome. `$presses` (on the scene too) hears every press on a
+    surface, the overlay's and each panel's, its event's point in that
+    surface's pixels, so ren-core's text actions work there: each surface
+    is the root its items' `getRootNode()` gives, holding `textAt`'s,
+    `selectText`'s and `selectedText`'s (ren-canv's README, "Text
+    actions"), and an Edit's ref holds its `editOf` actions and undo
+    history. A press on the scene's objects reaches the objects alone. A
+    right press keeps a focused Edit's native entry the DOM focus and its
+    selection (while one holds it, only a main press moves the focus to
+    the canvas), for the app's own menu.
   - **Theme.** `renderer.setTheme(tokens)` takes a new theme at once for the
     overlay and every panel; the scene and all state stay.
   - **Viewport.** In a three.js root `$viewport()` and `$media()` read the

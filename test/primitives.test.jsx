@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 import { Window as HappyWindow } from 'happy-dom';
 import * as THREE from 'three';
 import { $signal, $read, $write } from 'rrx-core';
-import { Root, View, Label, Edit, Action, Scroll, Show, Image, $active, $keys, $scrolls, $dispose, $focus } from 'ren-core';
+import { Root, View, Label, Edit, Action, Scroll, Show, Image, $active, $keys, $scrolls, $presses, $dispose, $focus, editOf, textAt, selectText, selectedText } from 'ren-core';
 import { $three, render, loadLayout, remoteLayout } from 'ren-three';
 import { serveLayout } from 'ren-canv/worker';
 import { Sfnt } from 'ren-canv';
@@ -973,6 +973,72 @@ describe('ren-three primitives', () => {
     three.input('pointerdown', ex, ey);
     press('a');
     assert.deepEqual(seen.slice(2), ['key field a'], "a panel's Edit: a field typed it");
+  });
+
+  it("hears every press with $presses on its own surface, the overlay's and a panel's, with the text under it (textAt)", () => {
+    const three = setup();
+    /** @type {string[]} */
+    const seen = [];
+    /** @type {any} */
+    let stop = false;
+    /** @type {any} */
+    let last = null;
+    const App = () => {
+      $presses(e => {
+        last = textAt(e);
+        seen.push(`${e.button} ${e.pointerType} ${e.target.getRootNode().panel ? 'panel' : 'overlay'} ${last?.text ?? '-'}`);
+      });
+      return (
+        <>
+          <Label text="overlay words" />
+          <group>
+            <View style={{ width: 100, padding: 10 }} onPointerDown={(/** @type {any} */ e) => { if (stop) e.stopPropagation(); }}>
+              <Label text="panel words" />
+            </View>
+          </group>
+        </>
+      );
+    };
+    render(() => <App />, three);
+    three.present();
+    const panel = /** @type {any} */ ([...three.surfaces].find(s => /** @type {any} */ (s).panel));
+    three.input('pointerdown', 10, 10, { button: 0, pointerType: 'touch' });
+    const [px, py] = three.project(panel, 30, 10 + 8);
+    three.input('pointerdown', px, py, { button: 0 });
+    three.input('pointerdown', px, py, { button: 2 });
+    assert.deepEqual(seen, ['0 touch overlay overlay words', '0 mouse panel panel words', '2 mouse panel panel words'], "each surface's own, in its own pixels");
+    // An item's stopPropagation keeps it from the root's.
+    stop = true;
+    three.input('pointerdown', px, py, { button: 0 });
+    assert.equal(seen.length, 3);
+    // The menu's "Select text" on the text the last press found.
+    assert.equal(typeof selectText(last.node), 'function');
+    assert.equal(selectedText(last.node), 'panel words', "a panel's text selects in its own surface");
+    assert.equal(selectedText(panel.root.first), 'panel words');
+  });
+
+  it("keeps a focused Edit's native entry focused on a right press, for the app's own menu", () => {
+    const window = new Window();
+    const doc = window.document;
+    const host = doc.createElement('div');
+    doc.body.appendChild(host);
+    /** @type {any} */
+    let edit = null;
+    const three = /** @type {any} */ ($three(THREE, { renderer: stub, width: 200, height: 100, schedule: false, font }));
+    const root = Root({ id: 'menus', target: host, renderer: three, children: <Edit ref={(/** @type {any} */ e) => (edit = e)} value="text" /> });
+    edit.focus();
+    three.present();
+    const area = /** @type {any} */ (doc.activeElement);
+    assert.equal(area?.tagName, 'TEXTAREA');
+    const canvas = three.canvas;
+    const down = new window.MouseEvent('mousedown', { button: 2, bubbles: true, cancelable: true });
+    canvas.dispatchEvent(down);
+    assert.equal(down.defaultPrevented, true, "the canvas does not take the focus as the press's default");
+    canvas.dispatchEvent(new window.PointerEvent('pointerdown', { button: 2, bubbles: true, cancelable: true }));
+    assert.equal(doc.activeElement, area, 'nor from the press handler');
+    assert.equal(edit.getRootNode().current, edit);
+    assert.equal(editOf(edit)?.value(), 'text');
+    $dispose(root);
   });
 
   it("deletes the faces it added to the document's fonts when its root is disposed", async () => {
