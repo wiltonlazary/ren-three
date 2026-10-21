@@ -167,7 +167,9 @@ Root({ id: 'stage', target: document.body, renderer: $three(THREE, { width: 640,
     surface's pixels, so ren-core's text actions work there: each surface
     is the root its items' `getRootNode()` gives, holding `textAt`'s,
     `selectText`'s and `selectedText`'s (ren-canv's README, "Text
-    actions"), and an Edit's ref holds its `editOf` actions and undo
+    actions": `textAt` finds a button's label too, `pressed`, and a press
+    in a text `selectText` opened selects there, never pressing what holds
+    it), and an Edit's ref holds its `editOf` actions and undo
     history. A press on the scene's objects reaches the objects alone. A
     right press keeps a focused Edit's native entry the DOM focus and its
     selection (while one holds it, only a main press moves the focus to

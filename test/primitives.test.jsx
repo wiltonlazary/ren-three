@@ -1017,6 +1017,35 @@ describe('ren-three primitives', () => {
     assert.equal(selectedText(panel.root.first), 'panel words');
   });
 
+  it("selects an opened text an overlay's Action holds, pressing nothing (textAt: pressed)", () => {
+    const three = /** @type {any} */ (setup());
+    let presses = 0;
+    /** @type {any} */
+    let hit = null;
+    /** @type {any} */
+    let label = null;
+    render(() => (
+      <View onPointerDown={(/** @type {any} */ e) => (hit = textAt(e))}>
+        <Action onPress={() => presses++} style={{ align: 'start' }}>
+          <Label ref={(/** @type {any} */ e) => (label = e)} text="hello world" />
+        </Action>
+      </View>
+    ), three);
+    three.present();
+    const r = label.getBoundingClientRect();
+    const y = r.y + r.height / 2;
+    three.input('pointerdown', r.x + 1, y, { button: 2 });
+    assert.equal(hit?.node === label && hit.pressed, true, "an Action's label, pressed");
+    selectText(label);
+    three.input('pointerdown', r.x + 1, y, { button: 0 });
+    three.input('pointermove', r.x + r.width / 2, y);
+    three.input('pointerup', r.x + r.width / 2, y);
+    const part = selectedText(label);
+    assert.ok(part.length > 0 && part.length < 11 && 'hello world'.startsWith(part), `a part is selected (${part})`);
+    assert.equal(presses, 0, 'the Action is not pressed');
+    assert.equal(three.overlay.pressed === null && three.overlay.current === null, true, 'nor in its press state or focused');
+  });
+
   it("keeps a focused Edit's native entry focused on a right press, for the app's own menu", () => {
     const window = new Window();
     const doc = window.document;
