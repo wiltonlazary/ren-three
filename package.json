@@ -1,6 +1,6 @@
 {
   "name": "ren-three",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "The three.js renderer for ren-core: JSX over a three.js scene graph, with raycast events, on-demand rendering and a frame loop.",
   "type": "module",
   "license": "MIT",
